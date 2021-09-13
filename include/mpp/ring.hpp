@@ -2,7 +2,7 @@
 
 /**
  * @file
- *   This file defines RingBuffer class for framework
+ *   This file defines ring buffer and iterator classes for framework
  */
 
 #include <cstdint>
@@ -41,23 +41,25 @@ public:
   pointer operator->() { return m_ptr; }
 
   ring_iterator& operator--() {
-    auto tmp = m_ptr - 1;
+    if (m_ptr != m_parent->m_tail) {
+      m_ptr--;
+    }
 
     if (m_parent->m_head < m_parent->m_tail) {
-      tmp = (tmp < m_parent->m_data) ? m_parent->m_end - 1 : tmp;
+      m_ptr = (m_ptr < m_parent->m_data) ? m_parent->m_end - 1 : m_ptr;
     }
-    m_ptr = (tmp < m_parent->m_tail) ? m_parent->m_tail : tmp;
 
     return *this;
   }
 
   ring_iterator& operator++() {
-    auto tmp = m_ptr + 1;
-
-    if (m_parent->mHead < m_parent->m_tail) {
-      tmp = (tmp >= m_parent->m_end) ? m_parent->m_data : tmp;
+    if (m_ptr != m_parent->m_head) {
+      m_ptr++;
     }
-    m_ptr = (tmp == m_parent->m_head) ? m_ptr : tmp;
+
+    if (m_parent->m_head < m_parent->m_tail) {
+      m_ptr = (m_ptr >= m_parent->m_end) ? m_parent->m_data : m_ptr;
+    }
 
     return *this;
   }
@@ -91,13 +93,23 @@ private:
 template <typename T> class ring {
 public:
   using value_type = std::decay_t<T>;
-  using iterator = ring_iterator<ring>;
   static_assert( std::is_same_v< T, value_type >);
+
+  using iterator = ring_iterator<ring>;
+  friend class ring_iterator<ring>;
 
   ring( value_type* aBuffer, const std::size_t aSize )
     : m_data(aBuffer)
     , m_end(aBuffer + aSize)
-    , m_max_size(aSize)
+    , m_head(aBuffer)
+    , m_tail(aBuffer)
+    , m_full(false)
+  {
+  }
+
+  ring( value_type* aBuffer, value_type* aEnd )
+    : m_data(aBuffer)
+    , m_end(aEnd)
     , m_head(aBuffer)
     , m_tail(aBuffer)
     , m_full(false)
@@ -107,7 +119,7 @@ public:
   iterator begin() { return ring_iterator(this, m_tail); }
   iterator end() { return ring_iterator(this, m_head); }
   inline bool full() { return m_full; }
-  inline bool empty() { return ( m_head == m_tail) && !m_full; }
+  inline bool empty() { return m_head == m_tail; }
   inline std::size_t max_size() { return m_end - m_data; }
   inline void clear() { m_head = m_data; m_tail = m_head; }
 
@@ -170,7 +182,13 @@ public:
       m_head = m_data;
     }
 
-    m_full = m_head == m_tail;
+    if (m_head == m_tail) {
+      m_full = true;
+      if ( ++m_tail == m_end )
+      {
+        m_tail = m_data;
+      }
+    }
   }
 
 private:
@@ -187,7 +205,6 @@ private:
   }
 
 private:
-  const std::size_t m_max_size;
   value_type *m_data, *m_end, *m_head, *m_tail;
   bool m_full;
 };
