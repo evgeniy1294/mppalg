@@ -13,7 +13,7 @@ struct Factors {
   float Imin;
 };
 
-
+// TODO: регуляторы должны работать в целочисленном режиме
 template< typename T >
 class Regulator: public PipeBlock< float, T >
 {
@@ -57,6 +57,10 @@ public:
 
   void SetTarget( output_type aTarget ) {
     mTarget = aTarget;
+  }
+
+  output_type GetTarget() {
+    return mTarget;
   }
 
   void Reset() {
