@@ -1,6 +1,7 @@
 #include <iostream>
 #include <chrono>
 #include <array>
+#include <algorithm>
 #include <unistd.h>
 #include <mpp/pipeblock.hpp>
 #include <mpp/pid.hpp>
@@ -8,24 +9,33 @@
 #include <mpp/ring.hpp>
 
 
+std::array<int, 10> buffer;
+mpp::ring<int> ring(buffer.data(), buffer.end());
+
+
 
 int main()
 {
-  mpp::pid::Regulator<int> Reg1(1, 0, 0);
-  mpp::pid::Regulator<int> Reg2(1, 0, 0);
-  mpp::ThresholdBlock<float>    Thr{-12, 12};
-  auto out = 7 >> Reg1[4] >> Reg2[6] >> Thr;
+  ring.push_back(0);
+  ring.push_back(1);
+  ring.push_back(2);
+  ring.push_back(3);
+  ring.push_back(4);
+  ring.push_back(5);
+  ring.push_back(6);
+  ring.push_back(7);
+  ring.push_back(8);
+  ring.push_back(9);
+  ring.push_back(9);
+  ring.push_back(9);
 
-  std::cout << out << std::endl;
+  for (auto i: ring)
+    std::cout << i << " ";
+  std::cout << std::endl;
 
-  // 1/10000 deg
-  std::int32_t pos1 = 120000;
-  std::int32_t pos2 = 125000;
-  std::int32_t spd1 = (pos2 - pos1) / 500;
-  std::int32_t spd2 = (pos1 - pos2) / 500;
-
-  std::cout << spd1 << std::endl;
-  std::cout << spd2 << std::endl;
+  auto is_actual = [](int i) { return i > 4; };
+  auto res = std::find_if(ring.begin(), ring.end(), is_actual);
+  std::cout << *res << std::endl;
 
   return 0; 
 }

@@ -22,8 +22,8 @@ public:
   using iterator_category = std::bidirectional_iterator_tag;
   using difference_type   = std::ptrdiff_t;
   using value_type        = typename T::value_type;
-  using pointer           = value_type*;
-  using reference         = value_type&;
+  using pointer           = typename T::pointer;
+  using reference         = typename T::reference;
   using parent            = T;
 
   ring_iterator(parent* aParent, pointer aPtr)
@@ -91,12 +91,15 @@ private:
 
 
 template <typename T> class ring {
+  friend class ring_iterator<ring>;
 public:
   using value_type = std::decay_t<T>;
+  using pointer    = value_type*;
+  using reference  = value_type&;
+  using const_reference = const value_type&;
+  using iterator = ring_iterator<ring>;
   static_assert( std::is_same_v< T, value_type >);
 
-  using iterator = ring_iterator<ring>;
-  friend class ring_iterator<ring>;
 
   ring( value_type* aBuffer, const std::size_t aSize )
     : m_data(aBuffer)
@@ -116,6 +119,10 @@ public:
   {
   }
 
+  reference front() { return *m_tail; }
+  const_reference front() const { return *m_tail; }
+  reference back() { auto tmp = m_head - 1; return (tmp < m_data) ? m_end - 1 : tmp; }
+  const_reference back() const { return back(); }
   iterator begin() { return ring_iterator(this, m_tail); }
   iterator end() { return ring_iterator(this, m_head); }
   inline bool full() { return m_full; }
@@ -191,7 +198,7 @@ public:
     }
   }
 
-private:
+protected:
   inline void Assign( const value_type& value )
     requires std::is_copy_assignable_v<value_type>
   {
@@ -204,7 +211,7 @@ private:
     *m_head = std::move(value);
   }
 
-private:
+protected:
   value_type *m_data, *m_end, *m_head, *m_tail;
   bool m_full;
 };
