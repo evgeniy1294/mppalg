@@ -12,6 +12,8 @@
 #include <cstddef>
 #include <cstring>
 
+//#include <mpp/assert.h>
+
 
 namespace mpp {
 
@@ -102,20 +104,20 @@ public:
   static_assert( std::is_same_v< T, value_type >);
 
 
-  ring( value_type* aBuffer, const std::size_t aSize )
-    : m_data(aBuffer)
-    , m_end(aBuffer + aSize)
-    , m_head(aBuffer)
-    , m_tail(aBuffer)
+  ring( pointer a_buffer, const std::size_t a_size )
+    : m_data(a_buffer)
+    , m_end(a_buffer + a_size)
+    , m_head(a_buffer)
+    , m_tail(a_buffer)
     , m_full(false)
   {
   }
 
-  ring( value_type* aBuffer, value_type* aEnd )
-    : m_data(aBuffer)
-    , m_end(aEnd)
-    , m_head(aBuffer)
-    , m_tail(aBuffer)
+  ring( pointer a_buffer, pointer a_end )
+    : m_data(a_buffer)
+    , m_end(a_end)
+    , m_head(a_buffer)
+    , m_tail(a_buffer)
     , m_full(false)
   {
   }
@@ -179,65 +181,56 @@ public:
     Assign( std::forward<K>(data) );
 
     if ( m_full ) {
-      if ( ++m_tail == m_end )
-      {
-        m_tail = m_data;
-      }
+      m_tail = (++m_tail == m_end) ? m_data : m_tail;
     }
-
-    if ( ++m_head == m_end )
-    {
-      m_head = m_data;
-    }
+    m_head = (++m_head == m_end) ? m_data : m_head;
 
     if (m_head == m_tail) {
       m_full = true;
-      if ( ++m_tail == m_end )
-      {
-        m_tail = m_data;
-      }
+      m_tail = (++m_tail == m_end) ? m_data : m_tail;
     }
   }
 
-  void push_back(value_type* a_data, value_type* a_end) {
-    if (a_data >= a_end)
-      return;
+  void push_back(pointer a_data, pointer a_end) {
+    if (a_end > a_data) {
+      std::size_t size = a_end - a_data;
 
-    std::size_t size = a_end - a_data;
-
-    if ( size >= max_size() ) {
-      a_data = a_end - max_size();
-      memcpy(m_data, a_data, max_size());
-      m_tail = m_data;
-      m_head = m_end - 1;
-    }
-    else
-    {
-      auto insert_ptr = m_head;
-      auto insert_end = insert_ptr + size;
-      insert_end = (insert_end > m_end) ? insert_end - m_end : insert_end;
-
-      while(insert_ptr != insert_end) {
-        insert_ptr++ = *a_data++;
-        insert_ptr = (insert_ptr == m_end) ? m_data : insert_ptr;
+      if ( size >= max_size() ) {
+        a_data = a_end - max_size();
+        memcpy(m_data, a_data, max_size());
+        m_tail = m_data;
+        m_head = m_end - 1;
       }
+      else
+      {
+        auto insert_ptr = m_head;
+        auto insert_end = insert_ptr + size;
+        insert_end = (insert_end > m_end) ? insert_end - m_end : insert_end;
 
-      if ( is_below(m_tail, m_head, insert_ptr) ) {
-        m_tail = insert_ptr + 1;
-        m_tail = (m_tail == m_end) ? m_data : m_tail;
-        m_full = true;
+        while(insert_ptr != insert_end) {
+          *insert_ptr++ = *a_data++;
+          insert_ptr = (insert_ptr == m_end) ? m_data : insert_ptr;
+        }
+
+        if ( is_belong(m_tail, m_head, insert_ptr) ) {
+          m_tail = insert_ptr + 1;
+          m_tail = (m_tail == m_end) ? m_data : m_tail;
+        }
+        m_head = (insert_ptr == m_end) ? m_data : insert_ptr;
+
+        if (m_tail == m_head) {
+          m_full = true;
+          m_tail = (++m_tail == m_end) ? m_data : m_tail;
+        }
       }
-      m_head = (insert_ptr == m_end) ? m_data : insert_ptr;
-      m_tail = (m_head == m_tail) ? ((++m_tail == m_end) ? m_data : m_tail) : m_tail;
     }
-
     return;
   }
 
 
 
-protected:
-  inline void Assign( const value_type& value )
+private:
+  inline void Assign( const_reference value )
     requires std::is_copy_assignable_v<value_type>
   {
     *m_head = value;
@@ -249,12 +242,27 @@ protected:
     *m_head = std::move(value);
   }
 
-  inline bool is_below( value_type* ptr, value_type* first, value_type last) {
-    return true;
+  inline bool is_belong(pointer ptr, pointer first, pointer last) {
+    MPP_ASSERT(ptr   >= m_data && ptr   < m_end);
+    MPP_ASSERT(first >= m_data && first < m_end);
+    MPP_ASSERT(last  >= m_data && last  < m_end);
+
+    bool ret = false;
+
+    if (first < last) {
+      // <---first++++++++++last---->
+      ret = ptr >= first && ptr <= last;
+    }
+    else if (first > last) {
+      // <++++last---------first++++>
+      ret = ptr <= last || ptr >= first;
+    }
+
+    return ret;
   }
 
-protected:
-  value_type *m_data, *m_end, *m_head, *m_tail;
+private:
+  pointer m_data, m_end, m_head, m_tail;
   bool m_full;
 };
 
