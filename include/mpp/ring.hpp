@@ -137,14 +137,7 @@ public:
     std::size_t size = max_size();
 
     if (!m_full) {
-      if ( m_head >= m_tail )
-      {
-        size = m_head - m_tail;
-      }
-      else
-      {
-        size += ( m_head - m_tail );
-      }
+      size = (m_head >= m_tail) ? m_head - m_tail : size + (m_head - m_tail);
     }
 
     return size;
@@ -154,11 +147,7 @@ public:
     if ( !empty() )
     {
       m_full = false;
-
-      if ( ++m_tail == m_end )
-      {
-        m_tail = m_data;
-      }
+      m_tail = (++m_tail == m_end) ? m_data : m_tail;
     }
 
     return;
@@ -167,11 +156,7 @@ public:
   void pop_back() {
     if ( !empty() ) {
       m_full = false;
-
-      if ( --m_head < m_data )
-      {
-        m_head = m_end - 1;
-      }
+      m_head = (--m_head < m_data) ? m_end - 1 : m_head;
     }
 
     return;
