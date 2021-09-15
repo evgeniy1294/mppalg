@@ -10,6 +10,7 @@
 #include <type_traits>
 #include <iterator>
 #include <cstddef>
+#include <cstring>
 
 
 namespace mpp {
@@ -127,7 +128,7 @@ public:
   iterator end() { return ring_iterator(this, m_head); }
   inline bool full() { return m_full; }
   inline bool empty() { return m_head == m_tail; }
-  inline std::size_t max_size() { return m_end - m_data; }
+  inline std::size_t max_size() { return m_end - m_data - 1; }
   inline void clear() { m_head = m_data; m_tail = m_head; }
 
   std::size_t size() {
@@ -198,6 +199,43 @@ public:
     }
   }
 
+  void push_back(value_type* a_data, value_type* a_end) {
+    if (a_data >= a_end)
+      return;
+
+    std::size_t size = a_end - a_data;
+
+    if ( size >= max_size() ) {
+      a_data = a_end - max_size();
+      memcpy(m_data, a_data, max_size());
+      m_tail = m_data;
+      m_head = m_end - 1;
+    }
+    else
+    {
+      auto insert_ptr = m_head;
+      auto insert_end = insert_ptr + size;
+      insert_end = (insert_end > m_end) ? insert_end - m_end : insert_end;
+
+      while(insert_ptr != insert_end) {
+        insert_ptr++ = *a_data++;
+        insert_ptr = (insert_ptr == m_end) ? m_data : insert_ptr;
+      }
+
+      if ( is_below(m_tail, m_head, insert_ptr) ) {
+        m_tail = insert_ptr + 1;
+        m_tail = (m_tail == m_end) ? m_data : m_tail;
+        m_full = true;
+      }
+      m_head = (insert_ptr == m_end) ? m_data : insert_ptr;
+      m_tail = (m_head == m_tail) ? ((++m_tail == m_end) ? m_data : m_tail) : m_tail;
+    }
+
+    return;
+  }
+
+
+
 protected:
   inline void Assign( const value_type& value )
     requires std::is_copy_assignable_v<value_type>
@@ -209,6 +247,10 @@ protected:
     requires std::is_move_assignable_v<value_type>
   {
     *m_head = std::move(value);
+  }
+
+  inline bool is_below( value_type* ptr, value_type* first, value_type last) {
+    return true;
   }
 
 protected:
