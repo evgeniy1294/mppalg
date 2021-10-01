@@ -2,7 +2,7 @@
 
 /**
  * @file
- *   This file defines ring buffer and iterator classes for framework
+ *   This file defines ring buffer and iterator classes for framework.
  */
 
 #include <cstdint>
@@ -12,10 +12,11 @@
 #include <cstddef>
 #include <cstring>
 
-//#include <mpp/assert.h>
+#include <mpp/macro_assert.h>
 
 
 namespace mpp {
+
 
 template< class T >
 class ring_iterator {
@@ -29,20 +30,54 @@ public:
   using reference         = typename T::reference;
   using parent            = T;
 
-  ring_iterator(parent* aParent, pointer aPtr)
-    : m_parent(aParent)
-    , m_ptr(aPtr) {}
+  /**
+   * @brief This constructor creates a ring_iterator instance.
+   *
+   * @param[in]  a_parent A pointer to the parent class instance.
+   * @param[in]  a_ptr    A pointer to a data.
+   *
+  */
+  ring_iterator(parent* a_parent, pointer a_ptr)
+    : m_parent(a_parent)
+    , m_ptr(a_ptr) {}
 
-  ring_iterator(parent& aParent, pointer aPtr)
-    : m_parent(&aParent)
-    , m_ptr(aPtr) {}
 
+  /**
+   * @brief This constructor creates a ring_iterator instance.
+   *
+   * @param[in]  a_parent A pointer to the parent class instance.
+   * @param[in]  a_ptr    A pointer to a data.
+   *
+  */
+  ring_iterator(T& a_parent)
+    : m_parent(&a_parent)
+    , m_ptr(a_parent.m_tail) {}
+
+
+  /**
+   * @brief This method indicates whether or not the iterator equal ring head.
+   *
+   * @retval TRUE   If iterator is equal ring head.
+   * @retval FALSE  If iterator is not equal ring head.
+   *
+  */
   bool is_head() { return m_ptr == m_parent->m_head; }
+
+  /**
+   * @brief This method indicates whether or not the iterator equal ring tail.
+   *
+   * @retval TRUE   If iterator is equal ring tail.
+   * @retval FALSE  If iterator is not equal ring tail.
+   *
+  */
   bool is_tail() { return m_ptr == m_parent->m_tail; }
 
   reference operator*() const { return *m_ptr; }
   pointer operator->() { return m_ptr; }
 
+  /**
+   * @brief Prefix decrement.
+  */
   ring_iterator& operator--() {
     if (m_ptr != m_parent->m_tail) {
       m_ptr--;
@@ -55,6 +90,9 @@ public:
     return *this;
   }
 
+  /**
+   * @brief Prefix increment.
+  */
   ring_iterator& operator++() {
     if (m_ptr != m_parent->m_head) {
       m_ptr++;
@@ -67,10 +105,16 @@ public:
     return *this;
   }
 
+  /**
+   * @brief Postfix increment.
+  */
   ring_iterator operator++(int) {
     ring_iterator tmp = *this; ++(*this); return tmp;
   }
 
+  /**
+   * @brief Postfix decrement.
+  */
   ring_iterator operator--(int) {
     ring_iterator tmp = *this; --(*this); return tmp;
   }
@@ -83,6 +127,7 @@ public:
     return aLsh.m_ptr != aRsh.m_ptr;
   };
 
+  operator pointer() { return m_ptr; }
 private:
   parent* m_parent;
   pointer m_ptr;
@@ -92,8 +137,12 @@ private:
 
 
 
-
-template <typename T> class ring {
+/**
+ * @brief STL-compatibility embedded ring-buffer
+ * @note  The elements can be accessed only through iterators
+*/
+template <typename T> class ring
+{
   friend class ring_iterator<ring>;
 public:
   using value_type = std::decay_t<T>;
@@ -104,6 +153,13 @@ public:
   static_assert( std::is_same_v< T, value_type >);
 
 
+  /**
+   * @brief This constructor creates a ring buffer instance.
+   *
+   * @param[in]  a_buffer A pointer to the buffer.
+   * @param[in]  a_size   A buffer size.
+   *
+  */
   ring( pointer a_buffer, const std::size_t a_size )
     : m_data(a_buffer)
     , m_end(a_buffer + a_size)
@@ -113,6 +169,13 @@ public:
   {
   }
 
+  /**
+   * @brief This constructor creates a ring buffer instance.
+   *
+   * @param[in]  a_buffer A pointer to the buffer.
+   * @param[in]  a_end    A pointer to the end buffer.
+   *
+  */
   ring( pointer a_buffer, pointer a_end )
     : m_data(a_buffer)
     , m_end(a_end)
@@ -122,17 +185,61 @@ public:
   {
   }
 
+  /**
+   * @brief Access the first element.
+   * @note Calling front on an empty container is undefined.
+  */
   reference front() { return *m_tail; }
   const_reference front() const { return *m_tail; }
+
+  /**
+   * @brief Access the last element.
+   * @note Calling back on an empty container is undefined.
+  */
   reference back() { auto tmp = m_head - 1; return (tmp < m_data) ? m_end - 1 : tmp; }
   const_reference back() const { return back(); }
+
+  /**
+   * @brief Returns an iterator to the beginning.
+   */
   iterator begin() { return ring_iterator(this, m_tail); }
+
+  /**
+   * @brief Returns an iterator to the end.
+  */
   iterator end() { return ring_iterator(this, m_head); }
+
+  /**
+   * @brief checks whether the container is full.
+   *
+   * @retval TRUE   If buffer is full.
+   * @retval FALSE  If buffer is not full.
+   *
+  */
   inline bool full() { return m_full; }
+
+  /**
+   * @brief Checks whether the container is empty
+   *
+   * @retval TRUE   If buffer is empty.
+   * @retval FALSE  If buffer is not empty.
+   *
+  */
   inline bool empty() { return m_head == m_tail; }
+
+  /**
+   * @brief Returns the maximum possible number of elements
+  */
   inline std::size_t max_size() { return m_end - m_data - 1; }
+
+  /**
+   * @brief Clears the contents
+  */
   inline void clear() { m_head = m_data; m_tail = m_head; }
 
+  /**
+   * @brief Returns the number of elements
+  */
   std::size_t size() {
     std::size_t size = max_size();
 
@@ -143,6 +250,28 @@ public:
     return size;
   }
 
+  /**
+   * @brief Move ring logic to another buffer
+  */
+  void remap(pointer a_buffer, pointer a_end) {
+    m_data = a_buffer;
+    m_end  = a_end;
+    m_head = a_buffer;
+    m_tail = a_buffer;
+    m_full = false;
+  }
+
+  void remap(pointer a_buffer, const std::size_t a_size) {
+    m_data = a_buffer;
+    m_end  = a_buffer + a_size;
+    m_head = a_buffer;
+    m_tail = a_buffer;
+    m_full = false;
+  }
+
+  /**
+   * @brief Removes the first element
+  */
   void pop_front() {
     if ( !empty() )
     {
@@ -153,6 +282,10 @@ public:
     return;
   }
 
+
+  /**
+   * @brief Removes the last element
+  */
   void pop_back() {
     if ( !empty() ) {
       m_full = false;
@@ -162,6 +295,12 @@ public:
     return;
   }
 
+
+  /**
+   * @brief Adds an element to the end
+   *
+   * @param[in]  data A reference to data.
+  */
   template < typename K > void push_back( K&& data ) {
     Assign( std::forward<K>(data) );
 
@@ -176,6 +315,12 @@ public:
     }
   }
 
+  /**
+   * @brief Adds an elements to the end
+   *
+   * @param[in]  a_data A pointer to the buffer.
+   * @param[in]  a_end  A pointer to the end of buffer.
+  */
   void push_back(pointer a_data, pointer a_end) {
     if (a_end > a_data) {
       std::size_t size = a_end - a_data;
@@ -190,7 +335,7 @@ public:
       {
         auto insert_ptr = m_head;
         auto insert_end = insert_ptr + size;
-        insert_end = (insert_end > m_end) ? insert_end - m_end : insert_end;
+        insert_end = (insert_end > m_end) ? m_data + (insert_end - m_end) : insert_end;
 
         while(insert_ptr != insert_end) {
           *insert_ptr++ = *a_data++;
@@ -212,7 +357,16 @@ public:
     return;
   }
 
+  /**
+   * @brief Adds an elements to the end
+   * @note Очень опасная функция, переписать.
+  */
+  void push_from(iterator& a_iter, pointer a_data, pointer a_end) {
+    m_head = a_iter;
+    MPP_ASSERT(m_head >= m_data && m_head < m_end);
 
+    push_back(a_data, a_end);
+  }
 
 private:
   inline void Assign( const_reference value )
